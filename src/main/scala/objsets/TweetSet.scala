@@ -7,7 +7,8 @@ import TweetReader._
   */
 class Tweet(val user: String, val text: String, val retweets: Int) {
   override def toString: String =
-    "User: " + user + "\n" +
+  //    "User: " + user + "\n" +
+    "User: " + user +
       "Text: " + text + " [" + retweets + "]"
 }
 
@@ -108,10 +109,10 @@ abstract class TweetSet {
 
 class Empty extends TweetSet {
 
-  override def filter(p: Tweet => Boolean): TweetSet = new Empty
+  override def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
 
 
-  def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = ???
+  override def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = acc
 
   /**
     * The following methods are already implemented
@@ -133,9 +134,12 @@ class Empty extends TweetSet {
 
 class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
 
-  def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = ???
+  def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = {
+    if (p(elem)) this.remove(elem).filterAcc(p, acc.incl(elem))
+    else this.remove(elem).filterAcc(p, acc)
+  }
 
-  override def filter(p: Tweet => Boolean): TweetSet = ???
+  override def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
 
 
   /**
