@@ -1,5 +1,7 @@
 package objsets
 
+import java.util.NoSuchElementException
+
 import TweetReader._
 
 /**
@@ -9,7 +11,7 @@ class Tweet(val user: String, val text: String, val retweets: Int) {
   override def toString: String =
   //    "User: " + user + "\n" +
     "User: " + user +
-      "Text: " + text + " [" + retweets + "]"
+      " Text: " + text + " [" + retweets + "]"
 }
 
 /**
@@ -39,20 +41,20 @@ abstract class TweetSet {
     * This method takes a predicate and returns a subset of all the elements
     * in the original set for which the predicate is true.
     *
-    * Question: Can we implment this method here, or should it remain abstract
+    * Question: Can we implement this method here, or should it remain abstract
     * and be implemented in the subclasses?
     */
-  def filter(p: Tweet => Boolean): TweetSet // we can't implement it here
+  def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
 
   /**
-    * This is a helper method for `filter` that propagetes the accumulated tweets.
+    * This is a helper method for `filter` that propagates the accumulated tweets.
     */
   def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet
 
   /**
     * Returns a new `TweetSet` that is the union of `TweetSet`s `this` and `that`.
     *
-    * Question: Should we implment this method here, or should it remain abstract
+    * Question: Should we implement this method here, or should it remain abstract
     * and be implemented in the subclasses?
     */
   def union(that: TweetSet): TweetSet // we can't implement it here
@@ -63,10 +65,10 @@ abstract class TweetSet {
     * Calling `mostRetweeted` on an empty set should throw an exception of
     * type `java.util.NoSuchElementException`.
     *
-    * Question: Should we implment this method here, or should it remain abstract
+    * Question: Should we implement this method here, or should it remain abstract
     * and be implemented in the subclasses?
     */
-  def mostRetweeted: Tweet = ???
+  def mostRetweeted: Tweet // we can't implement it here
 
   /**
     * Returns a list containing all tweets of this set, sorted by retweet count
@@ -74,10 +76,10 @@ abstract class TweetSet {
     * have the highest retweet count.
     *
     * Hint: the method `remove` on TweetSet will be very useful.
-    * Question: Should we implment this method here, or should it remain abstract
+    * Question: Should we implement this method here, or should it remain abstract
     * and be implemented in the subclasses?
     */
-  def descendingByRetweet: TweetList = ???
+  def descendingByRetweet: TweetList
 
   /**
     * The following methods are already implemented
@@ -105,14 +107,20 @@ abstract class TweetSet {
     * This method takes a function and applies it to every element in the set.
     */
   def foreach(f: Tweet => Unit): Unit
+
+  def isEmpty: Boolean
+
 }
 
 class Empty extends TweetSet {
 
-  override def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
-
+  //  override def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
 
   override def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = acc
+
+  override def mostRetweeted: Tweet = throw new NoSuchElementException
+
+  def descendingByRetweet: TweetList = Nil
 
   /**
     * The following methods are already implemented
@@ -130,17 +138,49 @@ class Empty extends TweetSet {
 
   override def union(that: TweetSet): TweetSet = that
 
+  def isEmpty: Boolean = true
+
 }
 
 class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
 
   def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = {
-    if (p(elem)) this.remove(elem).filterAcc(p, acc.incl(elem))
-    else this.remove(elem).filterAcc(p, acc)
+    //    if (p(elem)) this.remove(elem).filterAcc(p, acc.incl(elem))
+    //    else this.remove(elem).filterAcc(p, acc)
+    val x = left.filterAcc(p, right.filterAcc(p, acc))
+    if (p(elem)) x.incl(elem) else x
   }
 
-  override def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
+  //  override def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
 
+  override def mostRetweeted: Tweet = {
+    def max(t1: Tweet, t2: Tweet) = if (t1.retweets > t2.retweets) t1 else t2
+    if (left.isEmpty && right.isEmpty) elem
+    else if (left.isEmpty) max(right.mostRetweeted, elem)
+    else if (right.isEmpty) max(left.mostRetweeted, elem)
+    else max(left.mostRetweeted, max(elem, right.mostRetweeted))
+  }
+
+  def descendingByRetweet: TweetList = {
+//    def loop(set: TweetSet, acc: TweetList): TweetList = {
+//      if (set.isEmpty) {
+//        println(s"this is 1st if # acc - $acc ### set - $set")
+//        acc
+//      }
+//      else {
+//        val tweetToBeAdded = set.mostRetweeted
+//        val cons = new Cons(tweetToBeAdded, acc)
+//        val newSet = set.remove(tweetToBeAdded)
+//        println(s"this is 2nd else # acc - $acc ### set - $set")
+//        println(s"this is 2nd else #### cons = $cons @@@@ newSet = $newSet")
+//        loop(newSet, cons)
+//      }
+//    }
+//    loop(this, Nil)
+    val maxT = mostRetweeted
+    new Cons(maxT, remove(maxT).descendingByRetweet)
+    //    ???
+  }
 
   /**
     * The following methods are already implemented
@@ -170,7 +210,10 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
 
   override def toString = "{" + left + elem + right + "}"
 
-  override def union(that: TweetSet): TweetSet = ((left union right) union that) incl elem
+  //  override def union(that: TweetSet): TweetSet = ((left union right) union that) incl elem
+  override def union(that: TweetSet): TweetSet = left union (right union (that incl elem))
+
+  def isEmpty: Boolean = false
 }
 
 trait TweetList {
@@ -185,6 +228,8 @@ trait TweetList {
       f(head)
       tail.foreach(f)
     }
+
+  override def toString = head.user + " : " + tail.toString
 }
 
 object Nil extends TweetList {
@@ -193,6 +238,9 @@ object Nil extends TweetList {
   def tail = throw new java.util.NoSuchElementException("tail of EmptyList")
 
   def isEmpty = true
+
+  override def toString = "Nil"
+
 }
 
 class Cons(val head: Tweet, val tail: TweetList) extends TweetList {
@@ -204,7 +252,8 @@ object GoogleVsApple {
   val google = List("android", "Android", "galaxy", "Galaxy", "nexus", "Nexus")
   val apple = List("ios", "iOS", "iphone", "iPhone", "ipad", "iPad")
 
-  lazy val googleTweets: TweetSet = ???
+//  lazy val googleTweets: TweetSet = ???
+  lazy val googleTweets: TweetSet = TweetReader.allTweets
   lazy val appleTweets: TweetSet = ???
 
   /**
